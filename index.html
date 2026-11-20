@@ -3,52 +3,71 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Xbox 360 Homebrew Web Studio</title>
+  <meta name="theme-color" content="#101510" />
+  <meta name="description" content="A browser-based starter studio for creating Xbox 360 homebrew projects with libXenon." />
+  <title>Xbox 360 Homebrew Studio</title>
   <link rel="stylesheet" href="style.css" />
-  <!-- CodeMirror & JSZip via CDN -->
-  <link rel="stylesheet" href="https://cloudflare.com" />
-  <link rel="stylesheet" href="https://cloudflare.com" />
-  <script src="https://cloudflare.com"></script>
-  <script src="https://cloudflare.com"></script>
-  <script src="https://cloudflare.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css" />
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/clike/clike.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script defer src="app.js"></script>
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">Xbox 360 Homebrew Studio</div>
+    <a class="brand" href="./" aria-label="Xbox 360 Homebrew Studio home">
+      <span class="brand-mark" aria-hidden="true">X</span>
+      <span>Homebrew Studio <small>for Xbox 360</small></span>
+    </a>
     <div class="controls">
-      <input type="text" id="projectName" value="My360App" placeholder="Project Name" />
+      <label class="project-field">
+        <span class="visually-hidden">Project name</span>
+        <input type="text" id="projectName" value="My360App" placeholder="Project name" maxlength="48" />
+      </label>
+      <label class="visually-hidden" for="templateSelect">Starter template</label>
       <select id="templateSelect">
-        <option value="hello">Template: Console Hello World (libXenon)</option>
-        <option value="controller">Template: Gamepad Input Loop</option>
+        <option value="hello">Hello World</option>
+        <option value="controller">Controller input</option>
       </select>
-      <button id="exportZipBtn">Export Buildable Project (.zip)</button>
+      <button id="exportZipBtn" type="button"><span aria-hidden="true">↓</span> Export project</button>
     </div>
   </header>
 
   <main class="workspace">
     <aside class="sidebar">
-      <h3>Project Files</h3>
-      <ul>
-        <li class="active">src/main.c</li>
-        <li>Makefile</li>
-        <li>.github/workflows/build.yml</li>
-      </ul>
-      <div class="info-box">
-        <strong>How to run on Xbox 360:</strong>
-        <ol>
-          <li>Click <b>Export Buildable Project</b>.</li>
-          <li>Unzip and push to a GitHub repo.</li>
-          <li>Download <code>xenon.elf</code> from the repo's <b>Actions</b> tab.</li>
-          <li>Place <code>xenon.elf</code> on a FAT32 USB root and boot XeLL.</li>
-        </ol>
+      <div>
+        <div class="section-heading"><span>PROJECT</span><span class="project-dot" aria-hidden="true"></span></div>
+        <div class="project-label"><span class="folder-icon" aria-hidden="true">▾</span> My360App</div>
+        <ul class="file-list" aria-label="Project files">
+          <li class="active"><span class="file-icon c-icon">C</span> src/main.c</li>
+          <li><span class="file-icon">≡</span> Makefile</li>
+          <li><span class="file-icon yaml-icon">⚙</span> .github/workflows/build.yml</li>
+        </ul>
+      </div>
+      <div class="sidebar-bottom">
+        <div class="info-box">
+          <div class="info-title"><span aria-hidden="true">ⓘ</span> From browser to console</div>
+          <ol>
+            <li>Write your C code and export the project ZIP.</li>
+            <li>Unzip it into a GitHub repository and let Actions build it.</li>
+            <li>Download <code>xenon.elf</code> from the workflow artifact.</li>
+            <li>Copy it to FAT32 USB and launch it with XeLL on a homebrew-capable Xbox 360.</li>
+          </ol>
+        </div>
+        <p class="sidebar-note">Requires compatible homebrew-capable hardware/software. This does not run on a stock retail console.</p>
       </div>
     </aside>
 
-    <section class="editor-pane">
-      <textarea id="codeEditor"></textarea>
+    <section class="editor-area" aria-label="Code editor">
+      <div class="editor-toolbar">
+        <div class="tab"><span class="file-icon c-icon">C</span> main.c <span class="unsaved-dot" aria-label="Local editor"></span></div>
+        <span class="language-label">C&nbsp; <span>•</span>&nbsp; UTF-8</span>
+      </div>
+      <textarea id="codeEditor" aria-label="C source code editor"></textarea>
+      <div class="statusbar"><span><i class="status-light"></i> Ready</span><span>Xbox 360 · libXenon starter</span></div>
     </section>
   </main>
-
-  <script src="app.js"></script>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body>
 </html>
