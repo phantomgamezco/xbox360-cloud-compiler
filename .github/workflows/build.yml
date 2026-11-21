@@ -1,0 +1,34 @@
+name: Build Xbox 360 C++
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: free60/libxenon:latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Compile C++ to xenon.elf
+        id: compile
+        run: |
+          make > build.log 2>&1
+          cp *.elf32 xenon.elf
+
+      - name: Upload Compiler Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+
+      - name: Upload xenon.elf
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xenon-elf
+          path: xenon.elf
