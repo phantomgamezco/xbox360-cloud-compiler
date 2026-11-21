@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xbox 360 C++ Studio</title>
+  <script src="https://cloudflare.com"></script>
+  <style>
+    body { font-family: -apple-system, sans-serif; background: #0d1117; color: #c9d1d9; margin: 0; padding: 14px; }
+    h1 { color: #52b043; font-size: 19px; margin: 0 0 10px 0; }
+    .row { display: flex; gap: 8px; margin-bottom: 8px; }
+    input, select, textarea, button { border-radius: 8px; border: 1px solid #30363d; font-size: 14px; }
+    input, select { flex: 1; padding: 10px; background: #161b22; color: #fff; }
+    textarea { width: 100%; height: 320px; padding: 12px; background: #161b22; color: #7ee787; font-family: monospace; box-sizing: border-box; tab-size: 4; }
+    button { width: 100%; padding: 14px; background: #238636; color: #fff; font-weight: bold; border: none; margin-top: 8px; cursor: pointer; }
+    button:disabled { background: #30363d; color: #8b949e; }
+    #status { margin-top: 10px; padding: 12px; background: #161b22; border-radius: 8px; font-size: 14px; text-align: center; }
+    #logBox { display: none; margin-top: 10px; padding: 12px; background: #1c1012; border: 1px solid #f85149; color: #ffa198; font-family: monospace; font-size: 12px; white-space: pre-wrap; border-radius: 8px; max-height: 200px; overflow-y: auto; }
+    a.dl-btn { display: inline-block; margin-top: 6px; padding: 10px 16px; background: #1f6feb; color: #fff; text-decoration: none; border-radius: 6px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Xbox 360 C++ Cloud Studio</h1>
+  
+  <div class="row">
+    <input type="text" id="repo" placeholder="username/repo">
+    <input type="password" id="token" placeholder="ghp_yourTokenHere">
+  </div>
+
+  <div class="row">
+    <select id="templateSelect" onchange="loadTemplate()">
+      <option value="controller">Template: Controller & Console</option>
+      <option value="graphics">Template: Screen Colors & Input</option>
+      <option value="usb">Template: Read/Write USB File</option>
+    </select>
+  </div>
+
+  <textarea id="code" spellcheck="false" autocapitalize="off" autocorrect="off"></textarea>
+  
+  <button id="buildBtn" onclick="compileCode()">Compile to xenon.elf</button>
+  <div id="status">Ready to compile.</div>
+  <pre id="logBox"></pre>
+
+  <script>
+    const templates = {
+      controller: `#include <cstdio>
+#include <input/input.h>
+#include <xenos/xenos.h>
+#include <console/console.h>
+#include <usb/usbmain.h>
+
+int main() {
+    xenos_init();
+    console_init();
+    kmem_init();
+    usb_init();
+    usb_do_poll();
+
+    printf("=== Xbox 360 Controller Tester ===\\n");
+    printf("Press A, B, X, Y, or Start to reboot.\\n\\n");
+
+    struct controller_data_s oldc = {0};
+    while (true) {
+        struct controller_data_s c;
+        if (get_controller_data(&c, 0)) {
+            if (c.a && !oldc.a) printf("[A] Pressed\\n");
+            if (c.b && !oldc.b) printf("[B] Pressed\\n");
+            if (c.x && !oldc.x) printf("[X] Pressed\\n");
+            if (c.y && !oldc.y) printf("[Y] Pressed\\n");
+            if (c.start && !oldc.start) return 0; // Exits back to XeLL
+            oldc = c;
+        }
+        usb_do_poll();
+    }
+    return 0;
+}`,
+      graphics: `#include <cstdio>
+#include <input/input.h>
+#include <xenos/xenos.h>
+#include <console/console.h>
+#include <usb/usbmain.h>
+
+int main() {
+    xenos_init();
+    console_init();
+    kmem_init();
+    usb_init();
+    usb_do_poll();
+
+    // ANSI color codes work in libxenon console!
+    printf("\\033[2J\\033[H"); // Clear screen
+    printf("\\033[32mGreen Xbox Header\\033[0m\\n");
+    printf("\\033[36mPress A to clear screen, B to print red text.\\033[0m\\n");
+
+    struct controller_data_s oldc = {0};
+    while (true) {
+        struct controller_data_s c;
+        if (get_controller_data(&c, 0)) {
+            if (c.a && !oldc.a) printf("\\033[2J\\033[HScreen Cleared!\\n");
+            if (c.b && !oldc.b) printf("\\033[31mALERT: B Button Pressed!\\033[0m\\n");
+            oldc = c;
+        }
+        usb_do_poll();
+    }
+    return 0;
+}`,
+      usb: `#include <cstdio>
+#include <input/input.h>
+#include <xenos/xenos.h>
+#include <console/console.h>
+#include <usb/usbmain.h>
+#include <diskio/ata.h>
+
+int main() {
+    xenos_init();
+    console_init();
+    kmem_init();
+    usb_init();
+    usb_do_poll();
+
+    printf("Mounting USB storage (uda0:)...\\n");
+    FILE *f = fopen("uda0:/hello_xbox.txt", "w");
+    if (f) {
+        fprintf(f, "Created directly by my Xbox 360 C++ Homebrew!\\n");
+        fclose(f);
+        printf("SUCCESS: Wrote uda0:/hello_xbox.txt to your USB drive!\\n");
+    } else {
+        printf("ERROR: Could not open uda0:/hello_xbox.txt\\n");
+    }
+
+    while (true) {
+        usb_do_poll();
+    }
+    return 0;
+}`
+    };
+
+    const codeEl = document.getElementById('code');
+    const statusEl = document.getElementById('status');
+    const logEl = document.getElementById('logBox');
+    const btn = document.getElementById('buildBtn');
+
+    document.getElementById('repo').value = localStorage.getItem('x360_repo') || '';
+    document.getElementById('token').value = localStorage.getItem('x360_token') || '';
+    codeEl.value = localStorage.getItem('x360_code') || templates.controller;
+
+    function loadTemplate() {
+      const choice = document.getElementById('templateSelect').value;
+      if (confirm('Replace current editor code with this template?')) {
+        codeEl.value = templates[choice];
+      }
+    }
+
+    async function compileCode() {
+      const repo = document.getElementById('repo').value.trim();
+      const token = document.getElementById('token').value.trim();
+      const code = codeEl.value;
+
+      if (!repo || !token) return alert('Enter both username/repo and GitHub token.');
+      localStorage.setItem('x360_repo', repo);
+      localStorage.setItem('x360_token', token);
+      localStorage.setItem('x360_code', code);
+
+      btn.disabled = true;
+      logEl.style.display = 'none';
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      };
+
+      try {
+        statusEl.textContent = '1/3 Pushing main.cpp to GitHub...';
+        const fileUrl = `https://github.com{repo}/contents/source/main.cpp`;
+        const getRes = await fetch(fileUrl, { headers });
+        const fileData = getRes.ok ? await getRes.json() : {};
+
+        const pushRes = await fetch(fileUrl, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            message: 'Build from Xbox 360 Studio',
+            content: btoa(unescape(encodeURIComponent(code))),
+            sha: fileData.sha
+          })
+        });
+        if (!pushRes.ok) throw new Error('Push failed. Verify repo name and token permissions.');
+
+        const pushJson = await pushRes.json();
+        const commitSha = pushJson.commit.sha;
+
+        statusEl.textContent = '2/3 Compiling with xenon-g++ (~25s)...';
+        let run;
+        for (let i = 0; i < 25; i++) {
+          await new Promise(r => setTimeout(r, 3500));
+          const runsRes = await fetch(`https://github.com{repo}/actions/runs?head_sha=${commitSha}`, { headers });
+          const runsData = await runsRes.json();
+          run = runsData.workflow_runs && runsData.workflow_runs[0];
+          if (run && run.status === 'completed') break;
+        }
+
+        if (!run) throw new Error('Timed out waiting for GitHub Actions.');
+
+        statusEl.textContent = '3/3 Fetching build output...';
+        const artRes = await fetch(run.artifacts_url, { headers });
+        const artData = await artRes.json();
+
+        // If build failed, extract and display build.log directly on iPhone
+        if (run.conclusion !== 'success') {
+          const logArt = artData.artifacts.find(a => a.name === 'build-log');
+          if (logArt) {
+            const logZipRes = await fetch(logArt.archive_download_url, { headers });
+            const zip = await JSZip.loadAsync(await logZipRes.blob());
+            const logText = await zip.file('build.log').async('string');
+            logEl.textContent = logText;
+            logEl.style.display = 'block';
+          }
+          throw new Error('C++ Compilation Failed! See compiler errors below:');
+        }
+
+        // Extract raw xenon.elf directly in browser using JSZip!
+        const elfArt = artData.artifacts.find(a => a.name === 'xenon-elf');
+        const elfZipRes = await fetch(elfArt.archive_download_url, { headers });
+        const elfZip = await JSZip.loadAsync(await elfZipRes.blob());
+        const elfBlob = await elfZip.file('xenon.elf').async('blob');
+        const downloadUrl = URL.createObjectURL(elfBlob);
+
+        statusEl.innerHTML = `✅ Compiled successfully!<br><a class="dl-btn" href="${downloadUrl}" download="xenon.elf">Download xenon.elf</a>`;
+      } catch (err) {
+        statusEl.textContent = `❌ ${err.message}`;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
